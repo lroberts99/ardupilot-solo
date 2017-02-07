@@ -93,6 +93,9 @@ static bool set_mode(uint8_t mode)
         case STOP:
             success = stop_init(ignore_checks);
             break;
+        case GUIDED_NOGPS:
+            success = guided_nogps_init(ignore_checks);
+            break;
 
         default:
             success = false;
@@ -202,6 +205,9 @@ static void update_flight_mode()
             poshold_run();
             break;
 #endif
+        case GUIDED_NOGPS:
+            guided_nogps_run();
+            break;
 
         case STOP:
             stop_run();
@@ -300,9 +306,8 @@ static bool mode_has_manual_throttle(uint8_t mode) {
 // mode_allows_arming - returns true if vehicle can be armed in the specified mode
 //  arming_from_gcs should be set to true if the arming request comes from the ground station
 static bool mode_allows_arming(uint8_t mode, bool arming_from_gcs) {
-    if (mode_has_manual_throttle(mode) || mode == LOITER || mode == ALT_HOLD || mode == POSHOLD || (arming_from_gcs && mode == GUIDED)) {
+    if (mode_has_manual_throttle(mode) || mode == LOITER || mode == ALT_HOLD || mode == POSHOLD || (arming_from_gcs && (mode == GUIDED || mode == GUIDED_NOGPS)))
         return true;
-    }
     return false;
 }
 
@@ -313,6 +318,7 @@ static void notify_flight_mode(uint8_t mode) {
         case GUIDED:
         case RTL:
         case CIRCLE:
+        case GUIDED_NOGPS:
         case LAND:
             // autopilot modes
             AP_Notify::flags.autopilot_mode = true;
@@ -376,9 +382,11 @@ print_flight_mode(AP_HAL::BetterStream *port, uint8_t mode)
     case POSHOLD:
         port->print_P(PSTR("POSHOLD"));
         break;
+    case GUIDED_NOGPS:
+        port->print_P(PSTR("GUIDED_NOGPS"));
+        break;
     default:
         port->printf_P(PSTR("Mode(%u)"), (unsigned)mode);
         break;
     }
 }
-

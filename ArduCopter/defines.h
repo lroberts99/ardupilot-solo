@@ -110,7 +110,9 @@ enum aux_sw_func {
 #define AUTOTUNE    15                  // autotune the vehicle's roll and pitch gains
 #define POSHOLD     16                  // position hold with manual override
 #define STOP        17                  // Full-Stop using inertial/GPS system, no pilot input
-#define NUM_MODES   18
+#define GUIDED_NOGPS 18               // guided mode but only accepts attitude and altitude
+
+#define NUM_MODES   19
 
 #define DEPRECATED_MODES_MASK ((1UL<<8)|(1UL<<10)|(1UL<<12))
 

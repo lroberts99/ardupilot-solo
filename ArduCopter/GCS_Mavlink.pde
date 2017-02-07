@@ -1595,7 +1595,7 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
                 } else {
                     // assume that shots modes are all done in guided.
                     // NOTE: this may need to change if we add a non-guided shot mode
-                    bool shot_mode = (packet.param1 != 0.0f && control_mode == GUIDED);
+                    bool shot_mode = (packet.param1 != 0.0f && (copter.control_mode == GUIDED || copter.control_mode == GUIDED_NOGPS));
 
                     if (!shot_mode) {
                         if (set_mode(STOP)) {
@@ -1629,6 +1629,48 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
             accelcal.collect_sample();
         }
         command_ack_counter++;
+        break;
+    }
+    
+    case MAVLINK_MSG_ID_SET_ATTITUDE_TARGET:   // MAV ID: 82
+    {
+        // decode packet
+        mavlink_set_attitude_target_t packet;
+        mavlink_msg_set_attitude_target_decode(msg, &packet);
+
+        // exit if vehicle is not in Guided mode or Auto-Guided mode
+        if ((copter.control_mode != GUIDED) && (copter.control_mode != GUIDED_NOGPS) && !(copter.control_mode == AUTO && copter.auto_mode == Auto_NavGuided)) {
+            break;
+        }
+
+        // ensure type_mask specifies to use attitude and thrust
+        if ((packet.type_mask & ((1<<7)|(1<<6))) != 0) {
+            break;
+        }
+
+        // convert thrust to climb rate
+        packet.thrust = constrain_float(packet.thrust, 0.0f, 1.0f);
+        float climb_rate_cms = 0.0f;
+        if (is_equal(packet.thrust, 0.5f)) {
+            climb_rate_cms = 0.0f;
+        } else if (packet.thrust > 0.5f) {
+            // climb at up to WPNAV_SPEED_UP
+            climb_rate_cms = (packet.thrust - 0.5f) * 2.0f * copter.wp_nav.get_speed_up();
+        } else {
+            // descend at up to WPNAV_SPEED_DN
+            climb_rate_cms = (0.5f - packet.thrust) * 2.0f * -fabsf(copter.wp_nav.get_speed_down());
+        }
+
+        // if the body_yaw_rate field is ignored, use the commanded yaw position
+        // otherwise use the commanded yaw rate
+        bool use_yaw_rate = false;
+        if ((packet.type_mask & (1<<2)) == 0) {
+            use_yaw_rate = true;
+        }
+
+        copter.guided_set_angle(Quaternion(packet.q[0],packet.q[1],packet.q[2],packet.q[3]),
+            climb_rate_cms, use_yaw_rate, packet.body_yaw_rate);
+
         break;
     }
 
